@@ -276,12 +276,13 @@ def _handle_stats(frac_precision: int = 12) -> None:
         values = [float(x) for x in values_str.split()]
         arr = np.array(values)
         
-        mean_val = np.mean(arr)
-        median_val = np.median(arr)
-        std_val = np.std(arr)
-        min_val = np.min(arr)
-        max_val = np.max(arr)
-        sum_val = np.sum(arr)
+        # Convert numpy types to native Python types for decimal_to_dozenal
+        mean_val = float(np.mean(arr))
+        median_val = float(np.median(arr))
+        std_val = float(np.std(arr))
+        min_val = float(np.min(arr))
+        max_val = float(np.max(arr))
+        sum_val = float(np.sum(arr))
         
         print("\nStatistics:")
         print(f"  Count:      {len(values)}")
