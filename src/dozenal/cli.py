@@ -5,10 +5,12 @@ from collections.abc import Sequence
 from decimal import Decimal
 from typing import Mapping
 
+from .dozenal_calc import calculate
 from .dozenal_decimal_converter import decimal_to_dozenal, dozenal_to_decimal
 
 _TOOLS: Mapping[str, str] = {
     "converter": "Dozenal decimal converter (src/dozenal/dozenal_decimal_converter.py)",
+    "calculator": "Dozenal calculator (src/dozenal/dozenal_calc.py)",
 }
 
 
@@ -43,7 +45,7 @@ def _run_converter(args: argparse.Namespace) -> int:
 def run_cli(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="dozenal",
-        description="Dozenal utilities (converter, future tools).",
+        description="Dozenal utilities (converter, calculator, future tools).",
     )
     parser.add_argument(
         "--tool",
@@ -69,6 +71,13 @@ def run_cli(argv: Sequence[str] | None = None) -> int:
         help="Fractional precision when converting decimals to dozenal (default 12).",
     )
 
+    calculator_group = parser.add_argument_group("dozenal_calc options")
+    calculator_group.add_argument(
+        "--calc-expr",
+        type=str,
+        help="Evaluate the dozenal expression using the calculator tool.",
+    )
+
     args = parser.parse_args(argv)
 
     if args.list_tools:
@@ -80,7 +89,23 @@ def run_cli(argv: Sequence[str] | None = None) -> int:
             parser.error("--tool converter requires --to-doz or --to-dec")
         return _run_converter(args)
 
+    if args.tool == "calculator":
+        if not args.calc_expr:
+            parser.error("--tool calculator requires --calc-expr")
+        return _run_calculator(args)
+
     _print_tools()
+    return 0
+
+
+def _run_calculator(args: argparse.Namespace) -> int:
+    try:
+        result = calculate(args.calc_expr, frac_precision=args.frac_precision)
+    except Exception as exc:  # pragma: no cover - argparse should have validated the expression
+        raise SystemExit(f"error evaluating {args.calc_expr!r}: {exc}") from exc
+
+    print(f"Decimal result: {result.decimal}")
+    print(f"Dozenal result: {result.dozenal}")
     return 0
 
 

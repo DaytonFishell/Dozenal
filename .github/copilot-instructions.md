@@ -1,40 +1,33 @@
 # Dozenal Project Instructions for AI Agents
 
 ## What to know up front
-- This project is a single small package under `src/dozenal/`. The only implemented module today is `dozenal_decimal_converter.py`, so treat that file as the definitive logic source for base-12 conversions.
-- The package entry point (`src/dozenal/__init__.py`) exposes `main()` that prints a placeholder message; new CLI behavior must be wired through the `dozenal = dozenal:main` script declared in `pyproject.toml`.
-- Python 3.14+ is required (`pyproject.toml` and `.python-version`), and the repo bootstraps via `uv_build` (see `pyproject.toml`).
+- The package lives entirely under `src/dozenal/` with two feature modules today: `dozenal_decimal_converter.py` (base-12 conversion utilities) and the new `dozenal_calc.py` (expression calculator). `src/dozenal/cli.py` wires both together behind the `dozenal` entry point declared as `dozenal = dozenal:main` in `pyproject.toml`.
+- `src/dozenal/__init__.py` now delegates directly to `run_cli`, so any CLI changes must stay inside `cli.py` and new tool modules registered in `_TOOLS`.
+- Python 3.14+ is required (`pyproject.toml`/`.python-version`), and the project builds with `uv_build`; keep that backend in mind when updating dependencies or packaging.
 
 ## Key patterns to follow
-- `_DOZENAL_DIGITS = "0123456789TE"` defines the mapping. All digit validation and formatting logic should index this string so updates in one place affect both serialization and parsing.
-- `decimal_to_dozenal` distinguishes ints, floats, and `Decimal` inputs. Floats are first converted to `Fraction(...).limit_denominator(10**9)`, wrapped in `Decimal`, and then split into integer and fractional parts. When expanding new behavior, mirror that flow to preserve exactness for repeating base-12 fractions.
-- `_int_to_base12` and `_int_from_base12` handle sign-less integer parts without lookup caches; keep their loops straightforward when extending integer logic.
-- `dozenal_to_decimal` uppercases and strips whitespace before splitting on `.`; extra decimal points or invalid characters raise `ValueError`. Fractional digits are accumulated by dividing by successive powers of 12 so new parsing logic (e.g., suffixes) must keep that Decimal accumulation strategy.
-- Tests in `tests/test_dozenal_decimal_converter.py` rely on the helper in `tests/conftest.py` to inject `src` into `sys.path`. Any new tests should live under `tests/` and keep the same pytest style (parameterized cases) so they run predictably.
-- The `if __name__ == "__main__"` block in `dozenal_decimal_converter.py` is a simple CLI for quick conversions; more complex CLI features should be added to `src/dozenal/cli.py` and routed through the main entry point.
-- When adding new tools, create separate modules under `src/dozenal/` and add them to the `_TOOLS` mapping in `cli.py` for automatic CLI integration.
-- The CLI uses `argparse` for parsing; maintain the existing structure when adding new flags or tools to ensure consistent user experience.
-- This project uses strict type hints and `mypy` for static analysis. When adding new functions or modules, ensure all public APIs are fully annotated and that `mypy` checks pass without errors.
-
-## Workflow nuggets
-- Run the unit suite with `python -m pytest tests`. (There is no custom runner defined yet, so helper scripts or `uv` commands are unnecessary.)
-- Build or package the project with `uv build` from the repo root because the build backend is `uv_build` and the lockfile is `uv.lock`.
-- The CLI script named `dozenal` maps to `dozenal:main`; command routing now lives in `src/dozenal/cli.py` and exposes a `--tool/-t` flag with a converter tool that mirrors the standalone converter CLI.
+- `_DOZENAL_DIGITS = "0123456789TE"` remains the single source of truth for parsing/formatting dozenal digits. Reference it (or the derived `_ALLOWED_DIGITS` set in `dozenal_calc.py`) in any new parsing logic so all modules stay consistent.
+- `decimal_to_dozenal` normalizes ints, floats, and `Decimal`s by routing floats through `Fraction(...).limit_denominator(10**9)` before switching to `Decimal`, then splits integer/fractional parts to multiply the fractional remainder by 12 repeatedly. Match that flow when adding new features touching fractional conversion precision.
+- `_int_to_base12`/`_int_from_base12` keep the integer loop simple and sign-less. Any extensions that accept signed inputs should wrap these helpers rather than changing their inner loops.
+- `dozenal_to_decimal` uppercases, trims, and validates digits before accumulating fractional digits via successive powers of 12 so new parsing layers must keep accumulating through `Decimal` for fractional accuracy.
+- `dozenal_calc.calculate()` tokenizes expressions (numbers using `_ALLOWED_DIGITS`, `+ - * /`, parentheses) then converts each dozenal literal to `Decimal` before shunting-yard evaluation. `CalculatorResult` includes both the `Decimal` and formatted dozenal string, and invalid syntax raises `ValueError` so callers can signal bad input up to the CLI.
+- Every CLI tool registers in `src/dozenal/cli.py`'s `_TOOLS` mapping. Arguments live inside tool-specific groups (`dozenal_decimal_converter` vs `dozenal_calc`) with `argparse` ensuring mutual exclusion and clear error messages. Keep new tool flags grouped like this to avoid cluttering the shared namespace.
+- Tests rely on `tests/conftest.py` to insert `src/` into `sys.path`, so all new tests belong in `tests/` and should follow the existing pytest style (parameterized cases + explicit `Decimal` expectations) for reliable automation.
 
 ## CLI guidance
-- The `dozenal` CLI runs `run_cli` in `src/dozenal/cli.py`, which lists available tools and currently defaults to the `converter` tool backed by `src/dozenal/dozenal_decimal_converter.py`.
-- Use the converter via `dozenal --tool converter --to-doz 3.5` or `dozenal --tool converter --to-dec T`. The CLI enforces at least one of `--to-doz`/`--to-dec` when converter is selected and accepts `--frac-precision` for fractional conversion.
-- `--list-tools` enumerates future tools and integrates easily with new command files once they are added to `_TOOLS`.
+- The `dozenal` CLI (entry point from `pyproject.toml`) runs `run_cli` in `src/dozenal/cli.py`. `--tool/-t` selects between `converter` and `calculator`, and `--list-tools` prints `_TOOLS` so adding new modules is just a matter of populating that dictionary.
+- Use the converter via `dozenal --tool converter --to-doz 3.5` or `dozenal --tool converter --to-dec T`. The CLI enforces that `--to-doz`/`--to-dec` are mutually exclusive and requires at least one when running the converter.
+- Use the calculator via `dozenal --tool calculator --calc-expr "1.T + 2"`; output prints both the `Decimal` result and the dozenal string (formatted with `--frac-precision`). The same `--frac-precision` flag controls fractional digits for both tools because both rely on `decimal_to_dozenal`.
+- `--list-tools` enumerates the entries in `_TOOLS` (currently `converter` and `calculator`), so newly added tools appear automatically without touching the CLI parser.
 
-## When editing conversions or adding features
-- Preserve the `Decimal` context precision logic (`getcontext().prec = max(28, frac_precision * 3)`) before computing fractional digits; it ensures repeated multiplications stay accurate.
-- Negative values are handled by keeping track of a `sign` string and applying it after the conversion loops, so maintain that separation when adding new branches.
-- When introducing more digits or alternative representations (e.g., lowercase output), update both `_DOZENAL_DIGITS` and `dozenal_to_decimal` validation loops together.
-- Keep the CLI-friendly comment block in `dozenal_decimal_converter.py` (guarded by `if __name__ == "__main__"`) minimal; longer CLI features should live in separate modules to avoid inflating the conversion logic.
+## Workflow nuggets
+- Run the unit suite with `python -m pytest tests`. No custom runner exists yet, so the standard pytest invocation is the fastest way to confirm conversions and calculator behavior.
+- Build or package the project with `uv build` at the repo root because `uv_build` (declared as the build backend) is still required to generate distributable artifacts.
+- All CLI development flows through `run_cli`. Keep new functionality inside `cli.py`, add any helper modules under `src/dozenal/`, and register them in `_TOOLS` so the `dozenal` command keeps the same discovery surface.
 
 ## Notes for future enhancements
-- There are currently no async APIs or webhooks; focus on keeping conversions synchronous, deterministic, and easy to test.
-- Use `Decimal` for any fractional computation even if the input is a float: that is the established precision pattern.
-- No external dependencies beyond the standard library are declared, so avoid adding new packages unless necessary and, when you do, update `pyproject.toml` and regenerate `uv.lock` with `uv sync`.
+- The calculator currently supports `+ - * /` and parentheses, normalizes unary `+/-` before literals or parentheses (e.g., `-(1+1)`), and relies on the Decimal context precision (`max(28, frac_precision * 3)`) before evaluation. If you expose more operators, keep the shunting-yard and `_PRECEDENCE` table in sync.
+- Fractional precision is always passed to `decimal_to_dozenal`, so adjust `--frac-precision` in the CLI to control how many dozenal digits appear whenever a fractional component is present.
+- No third-party dependencies exist yet; if you add one (e.g., for parsing expressions), update `pyproject.toml`, regenerate `uv.lock` via `uv sync`, and mention it in these instructions.
 
-Let me know if any sections above need clarification or if you want me to document additional workflows.
+Let me know if any section needs clarification or if you'd like me to document additional workflows.
