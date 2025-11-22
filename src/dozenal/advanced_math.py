@@ -139,28 +139,3 @@ def eigenvalues(matrix: List[List[float]], frac_precision: int = 12) -> dict[str
             for val in eigenvals
         ]
     }
-
-
-def compute_fft(values: List[float], frac_precision: int = 12) -> dict[str, List[dict[str, str]]]:
-    """Compute Fast Fourier Transform of a sequence.
-    
-    Args:
-        values: List of values to transform
-        frac_precision: Fractional precision for dozenal conversion
-    
-    Returns:
-        Dictionary with FFT magnitudes
-    """
-    arr = np.array(values)
-    fft_result = np.fft.fft(arr)
-    magnitudes = np.abs(fft_result)
-    
-    return {
-        "magnitudes": [
-            {
-                "decimal": str(float(mag)),
-                "dozenal": decimal_to_dozenal(float(mag), frac_precision=frac_precision)
-            }
-            for mag in magnitudes
-        ]
-    }

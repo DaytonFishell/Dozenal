@@ -15,7 +15,7 @@ from typing import Callable
 
 import numpy as np
 
-from .advanced_math import polynomial_eval, trigonometric_functions, linear_regression
+from .advanced_math import polynomial_eval, trigonometric_functions, linear_regression, eigenvalues
 from .dozenal_calc import calculate
 from .dozenal_decimal_converter import decimal_to_dozenal, dozenal_to_decimal
 
@@ -44,6 +44,7 @@ def _print_help() -> None:
     print("  trig        - Trigonometric functions")
     print("  poly        - Polynomial evaluation")
     print("  regression  - Linear regression")
+    print("  eigen       - Calculate eigenvalues of a matrix")
     print("  help        - Show this help message")
     print("  quit/exit   - Exit the interactive mode")
     print()
@@ -367,6 +368,28 @@ def _handle_regression(frac_precision: int = 12) -> None:
     print()
 
 
+def _handle_eigen(frac_precision: int = 12) -> None:
+    """Handle eigenvalue computation."""
+    print("\nEigenvalue Computation")
+    print("Enter a 2x2 matrix (decimal values):")
+    
+    try:
+        a11 = float(input("  [0,0]: "))
+        a12 = float(input("  [0,1]: "))
+        a21 = float(input("  [1,0]: "))
+        a22 = float(input("  [1,1]: "))
+        
+        matrix = [[a11, a12], [a21, a22]]
+        result = eigenvalues(matrix, frac_precision=frac_precision)
+        
+        print("\nEigenvalues:")
+        for i, eval_data in enumerate(result["eigenvalues"], 1):
+            print(f"  λ{i}: {eval_data['decimal']:12} (decimal) = {eval_data['dozenal']:>12} (dozenal)")
+    except Exception as e:
+        print(f"Error: {e}")
+    print()
+
+
 def run_interactive(frac_precision: int = 12) -> int:
     """Run the interactive REPL interface.
     
@@ -390,6 +413,7 @@ def run_interactive(frac_precision: int = 12) -> int:
         "trig": lambda: _handle_trig(frac_precision),
         "poly": lambda: _handle_poly(frac_precision),
         "regression": lambda: _handle_regression(frac_precision),
+        "eigen": lambda: _handle_eigen(frac_precision),
     }
     
     while True:
