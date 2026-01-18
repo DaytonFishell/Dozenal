@@ -7,6 +7,7 @@ from typing import Mapping
 
 from .dozenal_calc import calculate
 from .dozenal_decimal_converter import decimal_to_dozenal, dozenal_to_decimal
+from .interactive import run_interactive
 
 _TOOLS: Mapping[str, str] = {
     "converter": "Dozenal decimal converter (src/dozenal/dozenal_decimal_converter.py)",
@@ -43,6 +44,14 @@ def _run_converter(args: argparse.Namespace) -> int:
 
 
 def run_cli(argv: Sequence[str] | None = None) -> int:
+    # If no arguments provided, launch interactive mode
+    if argv is None:
+        import sys
+        if len(sys.argv) == 1:
+            return run_interactive()
+    elif len(argv) == 0:
+        return run_interactive()
+    
     parser = argparse.ArgumentParser(
         prog="dozenal",
         description="Dozenal utilities (converter, calculator, future tools).",
@@ -58,6 +67,12 @@ def run_cli(argv: Sequence[str] | None = None) -> int:
         "--list-tools",
         action="store_true",
         help="List available tools and exit.",
+    )
+    parser.add_argument(
+        "--interactive",
+        "-i",
+        action="store_true",
+        help="Launch interactive mode.",
     )
 
     converter_group = parser.add_argument_group("dozenal_decimal_converter options")
@@ -79,6 +94,9 @@ def run_cli(argv: Sequence[str] | None = None) -> int:
     )
 
     args = parser.parse_args(argv)
+
+    if args.interactive:
+        return run_interactive(frac_precision=args.frac_precision)
 
     if args.list_tools:
         _print_tools()
